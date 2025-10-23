@@ -6,8 +6,9 @@ from schemas import ma, CategorySchema, RecipeSchema, UserSchema
 app = Flask(__name__)
 CORS(app, 
      supports_credentials=True, 
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-     origins=['http://localhost:5173'])
+     origins=['http://localhost:5173'],
+     allow_headers=['Content-Type'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -71,14 +72,18 @@ def logout():
     return jsonify({'message': 'Logout successful'}), 200
 
 # CHECK SESSION #
+# CHECK SESSION #
 @app.route('/check_session', methods=['GET'])
 def check_session():
     if 'user_id' in session:
         user = db.session.get(User, session['user_id'])
-        if user:  # Check if user actually exists
-            return jsonify({"logged_in": True, "username": user.username}), 200
+        if user:
+            user_schema = UserSchema()
+            return jsonify({
+                "logged_in": True,
+                "user": user_schema.dump(user)
+            }), 200
         else:
-            # User doesn't exist anymore, clear the session
             session.pop('user_id', None)
     return jsonify({"logged_in": False}), 200
 

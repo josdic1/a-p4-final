@@ -26,36 +26,45 @@ function App() {
     checkSession()
   }, [])
 
-  const checkSession = async () => {
-    const response = await fetch('http://localhost:5555/check_session', {
-      credentials: 'include'
-    })
-    const data = await response.json()
-    if (data.logged_in) {
-      setLoggedIn(true)
-      setCurrentUser(data.username)
-      fetchRecipes()
-      fetchCategories()
-    }
+const checkSession = async () => {
+  const response = await fetch('http://localhost:5555/check_session', {
+    credentials: 'include'
+  })
+  const data = await response.json()
+  
+  if (data.logged_in) {
+    setLoggedIn(true)
+    setCurrentUser(data.user.username)
+    setRecipes(data.user.recipes)  // Already loaded!
+    
+    // Extract unique categories from recipes
+    const uniqueCategories = [...new Set(data.user.recipes.map(r => r.category))];
+    setCategories(uniqueCategories)
+  } else {
+    setLoggedIn(false)
+    setCurrentUser(null)
+    setRecipes([])
+    setCategories([]) 
+  }
   }
 
   const handleRegister = async (e) => {
-  e.preventDefault()
-  
-  const response = await fetch('http://localhost:5555/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ username, password })
-  })
-  
-  const data = await response.json()
-  setMessage(data.message)
-  
-  if (response.ok) {
-    checkSession()
+    e.preventDefault()
+    
+    const response = await fetch('http://localhost:5555/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password })
+    })
+    
+    const data = await response.json()
+    setMessage(data.message)
+    
+    if (response.ok) {
+      checkSession()
+    }
   }
-}
 
   const fetchRecipes = async () => {
     const response = await fetch('http://localhost:5555/recipes', {
@@ -121,30 +130,30 @@ function App() {
     }
   }
 
-const handleDeleteRecipe = async (recipeId) => {
-  const response = await fetch(`http://localhost:5555/recipe/${recipeId}`, {
-    method: 'DELETE',
-    credentials: 'include'
-  })
-  
-  if (response.ok) {
+  const handleDeleteRecipe = async (recipeId) => {
+    const response = await fetch(`http://localhost:5555/recipe/${recipeId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    
+    if (response.ok) {
+      fetchRecipes()
+    }
+  }
+
+  const handleUpdateRecipe = async (recipeId) => {
+    await fetch(`http://localhost:5555/recipe/${recipeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: editRecipeName,
+        category_id: editCategoryId
+      })
+    })
+    setEditingRecipe(null)
     fetchRecipes()
   }
-}
-
-const handleUpdateRecipe = async (recipeId) => {
-  await fetch(`http://localhost:5555/recipe/${recipeId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      name: editRecipeName,
-      category_id: editCategoryId
-    })
-  })
-  setEditingRecipe(null)
-  fetchRecipes()
-}
 
   const handleAddCategory = async (e) => {
     e.preventDefault()
@@ -158,7 +167,6 @@ const handleUpdateRecipe = async (recipeId) => {
       setNewCategoryName('')
       await fetchCategories()
       
-      // Auto-select the new category if ID is returned
       if (response.data.id) {
         setSelectedCategory(response.data.id.toString())
       }
@@ -233,24 +241,23 @@ const handleUpdateRecipe = async (recipeId) => {
     }
   }
 
-
   if (loggedIn) {
     return (
-     <div className="App">
-  <div className="header">
-    <h1>Welcome, {currentUser}!</h1>
-    <button onClick={handleLogout} className="btn btn-danger">Logout</button>
-  </div>
+      <div className="App">
+        <div className="header">
+          <h1>Welcome, {currentUser}!</h1>
+          <button onClick={handleLogout} className="btn btn-danger">Logout</button>
+        </div>
 
-  <div className="button-group">
-    <button onClick={getMyRecipes} className="btn btn-primary">My Recipes</button>
-    <button onClick={getNotMyRecipes} className="btn btn-secondary">NOT my Recipes</button>
-    <button onClick={showAllRecipes} className="btn btn-success">All Recipes</button>
-    <button onClick={getMyCategories} className="btn btn-info">My Categories</button>
-    <button onClick={getNotMyCategories} className="btn btn-secondary">NOT my Categories</button>
-    <button onClick={showAllCategories} className="btn btn-warning">All Categories</button>
-    <button onClick={() => {setShowExtendedRecipes(false); setShowExtendedCategory(false)}} className="btn btn-orange">Hide Extended</button>
-  </div>
+        <div className="button-group">
+          <button onClick={getMyRecipes} className="btn btn-primary">My Recipes</button>
+          <button onClick={getNotMyRecipes} className="btn btn-secondary">NOT my Recipes</button>
+          <button onClick={showAllRecipes} className="btn btn-success">All Recipes</button>
+          <button onClick={getMyCategories} className="btn btn-info">My Categories</button>
+          <button onClick={getNotMyCategories} className="btn btn-secondary">NOT my Categories</button>
+          <button onClick={showAllCategories} className="btn btn-warning">All Categories</button>
+          <button onClick={() => {setShowExtendedRecipes(false); setShowExtendedCategory(false)}} className="btn btn-orange">Hide Extended</button>
+        </div>
         
         <h2>Add New Recipe:</h2>
         <form onSubmit={handleAddRecipe}>
@@ -306,51 +313,49 @@ const handleUpdateRecipe = async (recipeId) => {
         </ul>
 
         <h2>All Recipes:</h2>
-<ul>
-  {recipes.map(recipe => (
-    <li key={recipe.id}>
-      {editingRecipe === recipe.id ? (
-        // EDIT MODE
-        <div>
-          <input 
-            value={editRecipeName} 
-            onChange={(e) => setEditRecipeName(e.target.value)} 
-          />
-          <select 
-            value={editCategoryId} 
-            onChange={(e) => setEditCategoryId(e.target.value)}
-          >
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-          <button onClick={() => handleUpdateRecipe(recipe.id)}>Save</button>
-          <button onClick={() => setEditingRecipe(null)}>Cancel</button>
-        </div>
-      ) : (
-        // VIEW MODE
-        <div>
-          {recipe.name} - {recipe.category.name} (by {recipe.user.username})
-          <button onClick={() => extendedCategoryList(recipe.id)}>View Category</button>
-          {recipe.user.username === currentUser && (
-            <>
-              <button onClick={() => {
-                setEditingRecipe(recipe.id)
-                setEditRecipeName(recipe.name)
-                setEditCategoryId(recipe.category_id)
-              }} className="btn btn-warning">
-                Edit
-              </button>
-              <button onClick={() => handleDeleteRecipe(recipe.id)} className="btn btn-danger">
-                Delete
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </li>
-  ))}
-</ul>       
+        <ul>
+          {recipes.map(recipe => (
+            <li key={recipe.id}>
+              {editingRecipe === recipe.id ? (
+                <div>
+                  <input 
+                    value={editRecipeName} 
+                    onChange={(e) => setEditRecipeName(e.target.value)} 
+                  />
+                  <select 
+                    value={editCategoryId} 
+                    onChange={(e) => setEditCategoryId(e.target.value)}
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => handleUpdateRecipe(recipe.id)}>Save</button>
+                  <button onClick={() => setEditingRecipe(null)}>Cancel</button>
+                </div>
+              ) : (
+                <div>
+                  {recipe.name} - {recipe.category.name} (by {recipe.user.username})
+                  <button onClick={() => extendedCategoryList(recipe.id)}>View Category</button>
+                  {recipe.user.username === currentUser && (
+                    <>
+                      <button onClick={() => {
+                        setEditingRecipe(recipe.id)
+                        setEditRecipeName(recipe.name)
+                        setEditCategoryId(recipe.category_id)
+                      }} className="btn btn-warning">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteRecipe(recipe.id)} className="btn btn-danger">
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
 
         {showExtendedRecipes && (
           <div>
@@ -359,8 +364,7 @@ const handleUpdateRecipe = async (recipeId) => {
               {recipes
                 .filter(r => r.category_id === parseInt(selectedCategory))
                 .map(r => (
-                  <li key={r.id}>{r.name}
-                  </li>
+                  <li key={r.id}>{r.name}</li>
                 ))}
             </ol>
           </div>
@@ -382,38 +386,37 @@ const handleUpdateRecipe = async (recipeId) => {
     )
   }
 
+  return (
+    <div className="App">
+      <button onClick={onAutologin}>Auto Login</button>
+      <h1>Recipe App {isRegister ? 'Register' : 'Login'}</h1>
 
-return (
-  <div className="App">
-    <button onClick={onAutologin}>Auto Login</button>
-    <h1>Recipe App {isRegister ? 'Register' : 'Login'}</h1>
+      <form onSubmit={isRegister ? handleRegister : handleLogin}>
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button type="submit">{isRegister ? 'Register' : 'Login'}</button>
+      </form>
 
-    <form onSubmit={isRegister ? handleRegister : handleLogin}>
-      <input
-        type="text"
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button type="submit">{isRegister ? 'Register' : 'Login'}</button>
-    </form>
+      <p>
+        {isRegister ? 'Already have an account? ' : 'Need an account? '}
+        <button onClick={() => setIsRegister(!isRegister)}>
+          {isRegister ? 'Login' : 'Register'}
+        </button>
+      </p>
 
-    <p>
-      {isRegister ? 'Already have an account? ' : 'Need an account? '}
-      <button onClick={() => setIsRegister(!isRegister)}>
-        {isRegister ? 'Login' : 'Register'}
-      </button>
-    </p>
-
-    {message && <p>{message}</p>}
-  </div>
-)
+      {message && <p>{message}</p>}
+    </div>
+  )
 }
 
 export default App
